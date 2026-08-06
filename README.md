@@ -1,6 +1,6 @@
 # Doc Center File Routing Demo
 
-Upload or paste an article; a multi-class topic model (`ml_multi_v1`) decides whether it belongs in the **Doc Center** (cloud computing / telecommunications) or **Quarantine**.
+Upload or paste an article; a multi-class topic model (`ml_multi_v1`) routes it to **Doc Center**, **Needs review**, or **Quarantine** using max-proba confidence abstain.
 
 ## Requirements
 
@@ -36,8 +36,14 @@ Vite proxies `/api` to the backend on port 8000.
 ## How routing works
 
 1. Extract text from `.txt` / `.md` / `.pdf`, or use pasted text
-2. Predict topic with `data/models/ml_multi_v1.joblib`
-3. If topic is `cloud_computing` or `telecommunications` → **accepted** to Doc Center
-4. Otherwise → **quarantined**, with a message listing allowed topics
+2. Predict topic + `max-proba` with `data/models/ml_multi_v1.joblib`
+3. If `max-proba < τ` (default **0.26**, OOF-tuned in `ml_multi_v1`) → **Needs review**
+4. Else if topic is `cloud_computing` or `telecommunications` → **Doc Center**
+5. Else → **Quarantine**
 
-Session file lists (Doc Center / Quarantine) live in memory on the API process and reset when the backend restarts.
+Reviewers can Accept (→ Doc Center) or Reject (→ Quarantine) items in Needs review. Session lists and τ live in API memory and reset when the backend restarts.
+
+## Demo roles (mock switch in the UI)
+
+- **User** — upload; see last-upload outcome (accepted / needs review / quarantined); browse Doc Center only
+- **Reviewer** — adjust τ; see all three queues; open files; Accept / Reject on Needs review
