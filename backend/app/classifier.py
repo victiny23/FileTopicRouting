@@ -7,6 +7,10 @@ from pathlib import Path
 from typing import Any
 
 import joblib
+import numpy as np
+
+# OOF-selected max-proba threshold from ml_multi_v1 (coverage ≥ 70%).
+DEFAULT_TAU = 0.26
 
 ACCEPTED_TOPICS = frozenset({"cloud_computing", "telecommunications"})
 
@@ -36,12 +40,21 @@ def topic_label(topic: str) -> str:
 
 
 @dataclass
+class TokenContribution:
+    token: str
+    tfidf: float
+    coef: float
+    contribution: float
+
+
+@dataclass
 class Prediction:
     topic: str
     topic_label: str
-    status: str  # "accepted" | "quarantined"
+    status: str  # "accepted" | "quarantined" | "needs_review"
     message: str
     confidence: float
+    contributions: list[TokenContribution]
 
 
 class TopicClassifier:
@@ -51,10 +64,32 @@ class TopicClassifier:
             raise FileNotFoundError(f"Model not found at {path}")
         self.model: Any = joblib.load(path)
         self.model_path = path
-        clf = self.model.named_steps["clf"]
-        self.classes_: list[str] = list(clf.classes_)
+        self.tfidf = self.model.named_steps["tfidf"]
+        self.clf = self.model.named_steps["clf"]
+        self.classes_: list[str] = list(self.clf.classes_)
+        self.feature_names = np.asarray(self.tfidf.get_feature_names_out())
 
-    def predict(self, article_text: str) -> Prediction:
+    def explain(self, article_text: str, topic: str, top_k: int = 10) -> list[TokenContribution]:
+        class_index = self.classes_.index(topic)
+        x = self.tfidf.transform([article_text])
+        coefs = np.asarray(self.clf.coef_[class_index]).ravel()
+        x_dense = np.asarray(x.todense()).ravel()
+        contrib = x_dense * coefs
+        nz = np.flatnonzero(x_dense)
+        if len(nz) == 0:
+            return []
+        order = nz[np.argsort(np.abs(contrib[nz]))[::-1][:top_k]]
+        return [
+            TokenContribution(
+                token=str(self.feature_names[i]),
+                tfidf=float(x_dense[i]),
+                coef=float(coefs[i]),
+                contribution=float(contrib[i]),
+            )
+            for i in order
+        ]
+
+    def predict(self, article_text: str, tau: float = DEFAULT_TAU) -> Prediction:
         text = article_text.strip()
         if not text:
             raise ValueError("Article text is empty.")
@@ -64,8 +99,16 @@ class TopicClassifier:
         class_index = self.classes_.index(topic)
         confidence = float(proba[class_index])
         label = topic_label(topic)
+        contributions = self.explain(text, topic)
 
-        if topic in ACCEPTED_TOPICS:
+        if confidence < tau:
+            status = "needs_review"
+            message = (
+                f"This file may be about {label}, but confidence "
+                f"({confidence:.0%}) is below the review threshold ({tau:.0%}). "
+                "It has been sent to Needs review."
+            )
+        elif topic in ACCEPTED_TOPICS:
             status = "accepted"
             message = (
                 f"This file is about {label} and has been accepted to the Doc Center."
@@ -83,4 +126,5 @@ class TopicClassifier:
             status=status,
             message=message,
             confidence=confidence,
+            contributions=contributions,
         )

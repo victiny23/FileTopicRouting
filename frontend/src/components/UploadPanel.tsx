@@ -22,7 +22,6 @@ export function UploadPanel({
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
-
   const canSubmit = Boolean(file) || text.trim().length > 0;
 
   function takeFile(next: File | null) {
@@ -43,13 +42,19 @@ export function UploadPanel({
   }
 
   return (
-    <section className="upload-panel" aria-labelledby="upload-heading">
-      <h2 id="upload-heading" className="visually-hidden">
-        Upload article
-      </h2>
+    <section className="panel upload-panel" aria-labelledby="upload-heading">
+      <div className="panel__head">
+        <h2 id="upload-heading" className="panel__title">
+          Submit article
+        </h2>
+        <p className="panel__sub">
+          Upload .txt, .md, or .pdf — or paste text. Routing uses the current
+          confidence threshold.
+        </p>
+      </div>
 
       <div
-        className={`dropzone${dragging ? " dropzone--active" : ""}${file ? " dropzone--filled" : ""}`}
+        className={`dropzone${dragging ? " is-active" : ""}${file ? " is-filled" : ""}`}
         onDragEnter={(e) => {
           e.preventDefault();
           setDragging(true);
@@ -65,8 +70,7 @@ export function UploadPanel({
         onDrop={(e) => {
           e.preventDefault();
           setDragging(false);
-          const dropped = e.dataTransfer.files?.[0] ?? null;
-          takeFile(dropped);
+          takeFile(e.dataTransfer.files?.[0] ?? null);
         }}
       >
         <input
@@ -78,10 +82,8 @@ export function UploadPanel({
           onChange={(e) => takeFile(e.target.files?.[0] ?? null)}
         />
         <label htmlFor={inputId} className="dropzone__label">
-          <span className="dropzone__title">Drop an article here</span>
-          <span className="dropzone__hint">
-            .txt, .md, or .pdf — or click to browse
-          </span>
+          <span className="dropzone__title">Drop file or browse</span>
+          <span className="dropzone__hint">.txt · .md · .pdf</span>
         </label>
       </div>
 
@@ -90,37 +92,46 @@ export function UploadPanel({
           <span className="file-chip__name">{file.name}</span>
           <button
             type="button"
-            className="file-chip__clear"
+            className="btn btn--ghost btn--sm"
             onClick={() => {
               onFileChange(null);
               if (inputRef.current) inputRef.current.value = "";
             }}
-            aria-label="Remove selected file"
           >
             Clear
           </button>
         </div>
       ) : null}
 
-      <div className="divider" role="separator">
-        <span>or paste article text</span>
+      <div className="divider">
+        <span>or paste text</span>
       </div>
 
-      <label className="paste-label" htmlFor="paste-text">
-        Article text
-      </label>
+      <div className="field-label-row">
+        <label className="field-label" htmlFor="paste-text">
+          Article text
+        </label>
+        <button
+          type="button"
+          className="btn btn--ghost btn--sm"
+          disabled={!text}
+          onClick={() => onTextChange("")}
+        >
+          Clear paste
+        </button>
+      </div>
       <textarea
         id="paste-text"
         className="paste-area"
-        rows={8}
-        placeholder="Paste the full article body here…"
+        rows={7}
+        placeholder="Paste article body…"
         value={text}
         onChange={(e) => onTextChange(e.target.value)}
       />
 
       <button
         type="button"
-        className="route-btn"
+        className="btn btn--primary btn--block"
         disabled={!canSubmit || loading}
         onClick={onSubmit}
       >
