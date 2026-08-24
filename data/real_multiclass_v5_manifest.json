@@ -1,0 +1,14 @@
+{
+  "output": "data/real_multiclass_v5.csv",
+  "rows": 9989,
+  "topics": {
+    "business": 2000,
+    "education": 1990,
+    "entertainment": 2000,
+    "sports": 1999,
+    "technology": 2000
+  },
+  "domain_chunks": "data/domain_chunks.csv",
+  "news_dir": "data/new_articles_dataset",
+  "stub_min_words": 30
+}
